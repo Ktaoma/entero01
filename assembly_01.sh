@@ -116,11 +116,11 @@ do
     cat ${ensemble_dir}/QC_contigs.fa | grep ">" | cut -d"_" -f1 | sed 's\>\\g' > ${ensemble_dir}/QC_contigs_id.fa
 
     ## Plot the AA sequence in each full-length-AA contigs
-    Rscript ./plot_AA_02.R ${ensemble_dir}
+    Rscript ./02_plot_AA.R ${ensemble_dir}
    
     #3.4 curate UTR region of sequences from (3.3)
     seqkit grep -f ${ensemble_dir}/QC_contigs_id.fa ${ensemble_dir}/all_contigs.fa > ${ensemble_dir}/filter_contigs.fa
-    Rscript ./flip_strand_03.R ${ensemble_dir} ${out_dir} ${ref_dir}
+    Rscript ./03_flip_strand.R ${ensemble_dir} ${out_dir} ${ref_dir}
    
     #3.5 calculate read depth
 
