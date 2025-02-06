@@ -14,7 +14,7 @@ do
     mkdir -p $path_name
  
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    #1. sort reads into bucket
+    #1. Sort reads into bucket
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    
     zcat $sample_ |  NanoFilt --headcrop 50 --tailcrop 50 | gzip -9 > ${path_name}/trimmed_raw_reads.fq.gz
@@ -50,7 +50,7 @@ do
     fi
    
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    #2. denovo assembly with different parameters
+    #2. Denovo assembly with different parameters
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    
     for kmer in 33 55 77 99 111 127;
@@ -59,14 +59,15 @@ do
         do
            for qual in 10 15 20;
             do     
-            
+
+                    #2.1 create dir for SPades results
                     fl=$(echo ${output_name}/${out_dir}/${length}_${kmer}_${qual})
                     mkdir -p $fl
                    
-                    echo #Quality control
+                    #2.2 QC before assembling
                     zcat ${fl_0}/viral_read.fq.gz | NanoFilt -q ${qual} -l ${length} | gzip -9 > $fl/read_qc.fq.gz
                    
-                    echo #Denovo Assembly
+                    #2.3 perform genome assembly
                     ../../setup/SPAdes-4.0.0-Linux/bin/spades.py -s $fl/read_qc.fq.gz -k $kmer -o $fl/assembly --careful --threads 8 --memory 8
                     full_name=$(echo ${Bname}:${length}:${qual}:${kmer})
                     sed 's/NODE/'$full_name'/g' $fl/assembly/scaffolds.fasta | cut -d '_' -f1 | seqkit rename > $fl/assembly/scaffold_rename.fa
@@ -76,14 +77,14 @@ do
     done
 
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    ###3. first checkpoint: ensemble part
+    #3. Curated results
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+    #3.1 select the best mapped reference information
     ensemble_dir=$(echo ${output_name}/${out_dir}/ensemble)
     mkdir -p $ensemble_dir
-   
-    #3.1 select the best mapped reference information
-    ref_name=$(cat ${fl_0}/match.tsv |  awk '{ if ($3 >= 85) print $2 }' | sort | uniq -c | \
+    
+    ref_name=$(cat ${fl_0}/match.tsv |  awk '{ if ($3 >= 85 && $4 >= 100) print $2 }' | sort | uniq -c | \
         sort -k1 -n | tail -n1 | awk '{ print $2 }')
        
     awk '/^>/ {printf("\n%s\n",$0);next; } { printf("%s",$0);}  end {printf("\n");}' ${ref_dir}/ref_AA.fasta | \
