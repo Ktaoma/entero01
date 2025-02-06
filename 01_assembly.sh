@@ -110,8 +110,7 @@ do
     common_seq=$(seqkit fx2tab ${ensemble_dir}/contigs_full_length_AA.fa |\
                  cut -f2 | sort |uniq -c | grep $front_ref | grep $back_ref | sort -k1 -n | tail -n1 | awk '{ print $2 }')
 
-    #optimal_read_AA -> QC_contigs
-    #optimal_read_id -> QC_contigs_id
+
     seqkit fx2tab ${ensemble_dir}/contigs_full_length_AA.fa | grep $common_seq | seqkit tab2fx > ${ensemble_dir}/QC_contigs.fa
     cat ${ensemble_dir}/QC_contigs.fa | grep ">" | cut -d"_" -f1 | sed 's\>\\g' > ${ensemble_dir}/QC_contigs_id.fa
 
@@ -123,7 +122,6 @@ do
     Rscript ./03_flip_strand.R ${ensemble_dir} ${out_dir} ${ref_dir}
    
     #3.5 calculate read depth
-
     if [[ $read_count -gt 30000 ]]; then
 
         #depth based on downsampling
