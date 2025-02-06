@@ -83,87 +83,75 @@ do
     #3.1 select the best mapped reference information
     ensemble_dir=$(echo ${output_name}/${out_dir}/ensemble)
     mkdir -p $ensemble_dir
-    
+
+    ##3.1.2 get the reference id with highest frequency and get the sequence in fasta
+    ### Amino acid sequence
     ref_name=$(cat ${fl_0}/match.tsv |  awk '{ if ($3 >= 85 && $4 >= 100) print $2 }' | sort | uniq -c | \
         sort -k1 -n | tail -n1 | awk '{ print $2 }')
-       
     awk '/^>/ {printf("\n%s\n",$0);next; } { printf("%s",$0);}  end {printf("\n");}' ${ref_dir}/ref_AA.fasta | \
-        grep $ref_name -A1 > ${ensemble_dir}/ref_best.fa
+        grep $ref_name -A1 > ${ensemble_dir}/ref_AA_best.fa
+    
+    front_ref=$(cat ${ensemble_dir}/ref_AA_best.fa | seqkit subseq -r 1:4 | grep -v ">")    
+    back_ref=$(cat ${ensemble_dir}/ref_AA_best.fa | seqkit subseq -r -4:-1 | grep -v ">")
+    length_ref=$(cat ${ensemble_dir}/ref_AA_best.fa | seqkit stat | awk '{ print $5 }' | tail -n1 | sed 's\,\\g')
 
-    best_AA_id=$(grep ">" ${ensemble_dir}/ref_best.fa | cut -d ' ' -f1 | sed 's\>\\g')
+    ### DNA sequence
+    best_AA_id=$(grep ">" ${ensemble_dir}/ref_AA_best.fa | cut -d ' ' -f1 | sed 's\>\\g')
     best_DNA_id=$(grep ${best_AA_id} ${ref_dir}/cross_id.tsv | cut -f2)
     seqkit fx2tab ${ref_dir}/ref_DNA.fasta | grep ${best_DNA_id} | seqkit tab2fx > ${ensemble_dir}/ref_DNA_best.fa
 
-     
-    front_ref=$(cat ${ensemble_dir}/ref_best.fa | seqkit subseq -r 1:4 | grep -v ">")    
-    back_ref=$(cat ${ensemble_dir}/ref_best.fa | seqkit subseq -r -4:-1 | grep -v ">")
-    length_ref=$(cat ${ensemble_dir}/ref_best.fa | seqkit stat | awk '{ print $5 }' | tail -n1 | sed 's\,\\g')
-
-    ##3.2 combine contigs from all parameter sets
+    
+    #3.2 combine contigs from all parameter sets
     cat ${output_name}/${out_dir}/*/assembly/scaffold_rename.fa | \
-        seqkit rename | grep "\S" > ${ensemble_dir}/all_dna.fa
+        seqkit rename | grep "\S" > ${ensemble_dir}/all_contigs.fa
    
-    #3.3 select the contig with full length of AA
-    seqkit translate -f6 -s ${ensemble_dir}/all_dna.fa | seqkit seq -m $length_ref > ${ensemble_dir}/all_dna_full_length_AA.fa
+    #3.3 select the contig with full length of AA 
+    seqkit translate -f6 -s ${ensemble_dir}/all_contigs.fa | seqkit seq -m $length_ref > ${ensemble_dir}/contigs_full_length_AA.fa
+    common_seq=$(seqkit fx2tab ${ensemble_dir}/contigs_full_length_AA.fa |\
+                 cut -f2 | sort |uniq -c | grep $front_ref | grep $back_ref | sort -k1 -n | tail -n1 | awk '{ print $2 }')
 
-    #3.4 pass the first checkpoint (if not go to second or third)
-    success_=$(awk '/^>/ {printf("\n%s\n",$0);next; } { printf("%s",$0);}  end {printf("\n");}' ${ensemble_dir}/all_dna_full_length_AA.fa | grep -v ">" | grep $front_ref | grep $back_ref | wc -l)
+    #optimal_read_AA -> QC_contigs
+    #optimal_read_id -> QC_contigs_id
+    seqkit fx2tab ${ensemble_dir}/contigs_full_length_AA.fa | grep $common_seq | seqkit tab2fx > ${ensemble_dir}/QC_contigs.fa
+    cat ${ensemble_dir}/QC_contigs.fa | grep ">" | cut -d"_" -f1 | sed 's\>\\g' > ${ensemble_dir}/QC_contigs_id.fa
 
-    if [[ "$success_" -gt 0 ]]; then
-        # pass -> trim UTR
-        #3.5 filter AA
-        #3.5.1 plot
-        Rscript ./filter_AA.R ${ensemble_dir}
-       
-        #3.5.2 select common one
-        common_seq=$(seqkit fx2tab ${ensemble_dir}/all_dna_full_length_AA.fa |\
-                     cut -f2 | sort |uniq -c | grep $front_ref | grep $back_ref | sort -k1 -n | tail -n1 | awk '{ print $2 }')
-                     
-        seqkit fx2tab ${ensemble_dir}/all_dna_full_length_AA.fa | grep $common_seq | seqkit tab2fx > ${ensemble_dir}/optimal_read_AA.fa
-        cat ${ensemble_dir}/optimal_read_AA.fa | grep ">" | cut -d"_" -f1 | sed 's\>\\g' > ${ensemble_dir}/optimal_read_id.fa
-       
+    ## Plot the AA sequence in each full-length-AA contigs
+    Rscript ./plot_AA_02.R ${ensemble_dir}
+   
+    #3.4 curate UTR region of sequences from (3.3)
+    seqkit grep -f ${ensemble_dir}/QC_contigs_id.fa ${ensemble_dir}/all_contigs.fa > ${ensemble_dir}/filter_contigs.fa
+    Rscript ./flip_strand_03.R ${ensemble_dir} ${out_dir} ${ref_dir}
+   
+    #3.5 calculate read depth
 
-        #3.6 filter UTR        
-        #3.6.1: merge+flip strand
-        seqkit grep -f ${ensemble_dir}/optimal_read_id.fa ${ensemble_dir}/all_dna.fa > ${ensemble_dir}/optimal_read_DNA.fa
-        echo "----------------------------"
-        Rscript ./flip_strand.R ${ensemble_dir} ${out_dir} ${ref_dir}
-       
-        #3.6.3: depth
-        #depth down
+    if [[ $read_count -gt 30000 ]]; then
+
+        #depth based on downsampling
         minimap2 -a $ensemble_dir/final_consensus_DNA.fa ${fl_0}/viral_read.fq.gz > $ensemble_dir/map_${out_dir}.sam
         samtools sort $ensemble_dir/map_${out_dir}.sam -o $ensemble_dir/map_${out_dir}.bam
         samtools index $ensemble_dir/map_${out_dir}.bam
         samtools depth $ensemble_dir/map_${out_dir}.bam > $ensemble_dir/map_${out_dir}_depth.txt
-       
-        #depth total
+
+        
+        #depth based on total read
         minimap2 -a $ensemble_dir/final_consensus_DNA.fa ${fl_0}/viral_readT.fq.gz > $ensemble_dir/Tmap_${out_dir}.sam
         samtools sort $ensemble_dir/Tmap_${out_dir}.sam -o $ensemble_dir/Tmap_${out_dir}.bam
         samtools index $ensemble_dir/Tmap_${out_dir}.bam
         samtools depth $ensemble_dir/Tmap_${out_dir}.bam > $ensemble_dir/Tmap_${out_dir}_depth.txt
-       
+    
+      
     else
 
-        echo "fail -> fix frame"
-        mkdir -p ${ensemble_dir}/checkpoint02
-
-        zcat ${fl_0}/viral_read* | seqkit rmdup | seqkit fq2fa > ${ensemble_dir}/checkpoint02/rep.fa
-        cat ${ensemble_dir}/checkpoint02/rep.fa ${ensemble_dir}/all_dna.fa  > ${ensemble_dir}/checkpoint02/merge_final.fa
-        minimap2 -a ${ref_dir}/ref_DNA.fasta ${ensemble_dir}/checkpoint02/merge_final.fa > ${ensemble_dir}/checkpoint02/map_ref.sam
-        samtools sort ${ensemble_dir}/checkpoint02/map_ref.sam -o ${ensemble_dir}/checkpoint02/map_ref.bam
-        samtools index ${ensemble_dir}/checkpoint02/map_ref.bam
-        
-        id_=$(samtools idxstats ${ensemble_dir}/checkpoint02/map_ref.bam | sort -k3 -nr | head -n +1 | cut -f1)
-        samtools consensus --mode simple --min-depth 1 ${ensemble_dir}/checkpoint02/map_ref.bam -o ${ensemble_dir}/checkpoint02/map_ref_consensus.fa
-        
-        #
-        seqkit fx2tab ${ensemble_dir}/checkpoint02/map_ref_consensus.fa | grep ${id_} | seqkit tab2fx > ${ensemble_dir}/checkpoint02/map_ref_consensus2.fa
-        seqkit fx2tab ${ref_dir}/ref_DNA.fasta | grep ${id_} | seqkit tab2fx > ${ensemble_dir}/checkpoint02/ref_DNA2.fasta
-        #
-        
-        Rscript ./fix.R ${ensemble_dir}/checkpoint02/ref_DNA2.fasta ${ensemble_dir}/checkpoint02/map_ref_consensus2.fa ${ensemble_dir}/checkpoint02/DNA_fix.fa     
+        #depth based on total read
+        minimap2 -a $ensemble_dir/final_consensus_DNA.fa ${fl_0}/viral_read.fq.gz > $ensemble_dir/Tmap_${out_dir}.sam
+        samtools sort $ensemble_dir/Tmap_${out_dir}.sam -o $ensemble_dir/Tmap_${out_dir}.bam
+        samtools index $ensemble_dir/Tmap_${out_dir}.bam
+        samtools depth $ensemble_dir/Tmap_${out_dir}.bam > $ensemble_dir/Tmap_${out_dir}_depth.txt
+    
     fi
-   
+    
+    
+          
 done
 
 
