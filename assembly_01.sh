@@ -1,54 +1,56 @@
 #!/bin/bash
 
-input_dir=$1    #directory with fastq file 
+input_dir=$1    #directory with fastq files 
 output_name=$2  #output directory name
-ref_dir=$3      #path of RefSeq file 
+ref_dir=$3      #path of RefSeq files 
 
 #####
 
 for sample_ in $(ls ${input_dir}/*);
 do
-   
-    echo $sample_
+    #fl_0 -> path_name
     out_dir=$(echo $sample_ | rev | cut -d '/' -f1 | rev | cut -d '.' -f1)
-    fl_0=$(echo ${output_name}/${out_dir})
-    mkdir -p $fl_0
+    path_name=$(echo ${output_name}/${out_dir})
+    mkdir -p $path_name
  
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     #1. sort reads into bucket
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    
-    zcat $sample_ |  NanoFilt --headcrop 50 --tailcrop 50 | gzip -9 > ${fl_0}/trimmed_raw_reads.fq.gz
-    diamond blastx --threads 32 -d ${ref_dir}/ref_AA -q ${fl_0}/trimmed_raw_reads.fq.gz -o ${fl_0}/match.tsv
-    cat ${fl_0}/match.tsv  | awk -v sim="$similarity" '{ if ($3 >= 85 && $4 >= 100) print $1 }' | sort | uniq > ${fl_0}/match_read.txt
-    seqkit grep -f ${fl_0}/match_read.txt $sample_ | gzip -9 > ${fl_0}/viral_readT.fq.gz
-    read_count=$(seqkit fx2tab ${fl_0}/viral_readT.fq.gz | wc -l)
+    zcat $sample_ |  NanoFilt --headcrop 50 --tailcrop 50 | gzip -9 > ${path_name}/trimmed_raw_reads.fq.gz
+    diamond blastx --threads 32 -d ${ref_dir}/ref_AA -q ${path_name}/trimmed_raw_reads.fq.gz -o ${path_name}/match.tsv
+    cat ${path_name}/match.tsv  | awk '{ if ($3 >= 85 && $4 >= 100) print $1 }' | sort | uniq > ${path_name}/match_read.txt
+    seqkit grep -f ${path_name}/match_read.txt $sample_ | gzip -9 > ${path_name}/viral_readT.fq.gz
+    read_count=$(seqkit fx2tab ${path_name}/viral_readT.fq.gz | wc -l)
 
     if [[ $read_count -gt 30000 ]]; then
 
-        echo "downsampling is performed here"
-        minimap2 -a ${ref_dir}/ref_DNA.fasta  ${fl_0}/viral_readT.fq.gz >  ${fl_0}/aln.sam
-        samtools sort  ${fl_0}/aln.sam -o  ${fl_0}/aln.bam
-        samtools index  ${fl_0}/aln.bam
+        ## "downsampling is performed here"
+        #1.1 map to reference DNA 
+        minimap2 -a ${ref_dir}/ref_DNA.fasta  ${path_name}/viral_readT.fq.gz >  ${path_name}/aln.sam
+        samtools sort  ${path_name}/aln.sam -o  ${path_name}/aln.bam
+        samtools index  ${path_name}/aln.bam
 
-        best_index=$(samtools idxstat  ${fl_0}/aln.bam | sort -k3  -nr | head -n +1 | cut -f1)
-        samtools view -b ${fl_0}/aln.bam $best_index > ${fl_0}/sel.bam
-        samtools index ${fl_0}/sel.bam
-        samtools view -F 256 -bo ${fl_0}/sel_filter.bam ${fl_0}/sel.bam
-        samtools index ${fl_0}/sel_filter.bam
-        
-        rasusa aln --coverage 1000 ${fl_0}/sel_filter.bam | samtools sort -o  ${fl_0}/downsample.bam
-        samtools fastq  ${fl_0}/downsample.bam | gzip -9 >  ${fl_0}/viral_read.fq.gz
-        seqkit stat ${fl_0}/viral_read.fq.gz
+        #1.2 select the mapped reference with highest frequency of reads
+        best_index=$(samtools idxstat  ${path_name}/aln.bam | sort -k3  -nr | head -n +1 | cut -f1)
+        samtools view -b ${path_name}/aln.bam $best_index > ${path_name}/sel.bam
+        samtools index ${path_name}/sel.bam
+        samtools view -F 256 -bo ${path_name}/sel_filter.bam ${path_name}/sel.bam
+        samtools index ${path_name}/sel_filter.bam
+
+        #1.3 downsampling by usning rasusa databse (bbnorm could be used in the future version)
+        rasusa aln --coverage 1000 ${path_name}/sel_filter.bam | samtools sort -o  ${path_name}/downsample.bam
+        samtools fastq  ${path_name}/downsample.bam | gzip -9 >  ${path_name}/viral_read.fq.gz
+        seqkit stat ${path_name}/viral_read.fq.gz
 
     else
-
-        mv ${fl_0}/viral_readT.fq.gz ${fl_0}/viral_read.fq.gz
+        ## if reads are less than 30k, then do nothing.
+        mv ${path_name}/viral_readT.fq.gz ${path_name}/viral_read.fq.gz
     
     fi
    
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    #2. denovo with diferent paramter
+    #2. denovo assembly with different parameters
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
    
     for kmer in 33 55 77 99 111 127;
@@ -56,9 +58,8 @@ do
         for length in 0 100 300 500;
         do
            for qual in 10 15 20;
-            do      
-             
-                    echo #Prep dir
+            do     
+            
                     fl=$(echo ${output_name}/${out_dir}/${length}_${kmer}_${qual})
                     mkdir -p $fl
                    
