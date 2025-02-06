@@ -68,7 +68,7 @@ do
                     zcat ${fl_0}/viral_read.fq.gz | NanoFilt -q ${qual} -l ${length} | gzip -9 > $fl/read_qc.fq.gz
                    
                     #2.3 perform genome assembly
-                    ../../setup/SPAdes-4.0.0-Linux/bin/spades.py -s $fl/read_qc.fq.gz -k $kmer -o $fl/assembly --careful --threads 8 --memory 8
+                    spades.py -s $fl/read_qc.fq.gz -k $kmer -o $fl/assembly --careful --threads 8 --memory 8
                     full_name=$(echo ${Bname}:${length}:${qual}:${kmer})
                     sed 's/NODE/'$full_name'/g' $fl/assembly/scaffolds.fasta | cut -d '_' -f1 | seqkit rename > $fl/assembly/scaffold_rename.fa
                    
