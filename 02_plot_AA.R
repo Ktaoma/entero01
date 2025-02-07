@@ -3,6 +3,7 @@ library(msa)
 library(Biostrings)
 library(reshape2)
 library(ggplot2)
+
 #https://stackoverflow.com/questions/48218332/how-to-output-results-of-msa-package-in-r-to-fasta
 alignment2Fasta <- function(alignment, filename) {
   sink(filename)
@@ -20,34 +21,33 @@ alignment2Fasta <- function(alignment, filename) {
 }
 
 
-#########################################
-#AA check
-#########################################
-
+#Import AA from the complete contigs
 args <- commandArgs(trailingOnly = TRUE)
-AAA <- readAAStringSet(paste0(args[1],"/contigs_full_length_AA.fa")) %>% msa()
-alignment2Fasta(AAA,paste0(args[1],"/candidate_plot.fa"))
+AA_seq <- readAAStringSet(paste0(args[1],"/contigs_full_length_AA.fa")) %>% msa()
+alignment2Fasta(AA_seq,paste0(args[1],"/candidate_plot.fa"))
 x <- readAAStringSet(paste0(args[1],"/candidate_plot.fa")) %>% as.matrix()  %>% as.data.frame() 
 
+#Assign the type of AA based on frequency 
 for (u in 1:ncol(x)) {
-  fx <- table(x[,u]) %>% as.data.frame()
   
-  fx$type <- ifelse(fx$Freq == max(fx$Freq),"REF",
-                    ifelse(fx$Var1 == '-',"DEL",ifelse(fx$Var1 == 'X','X',"ALT")))
+  x2 <- table(x[,u]) %>% as.data.frame()
   
-  x2 <- x[,u] %>% as.data.frame()
-  colnames(x2) <- "Var1"
+  x2$type <- ifelse(x2$Freq == max(x2$Freq),"REF",
+                    ifelse(x2$Var1 == '-',"DEL",
+                           ifelse(x2$Var1 == 'X','X',"ALT")))
   
-  jx <- inner_join(x2,fx)
-  x[,u] <- jx$type
+  x3 <- x2[,u] %>% as.data.frame()
+  colnames(x3) <- "Var1"
   
+  x4 <- inner_join(x3,x2)
+  x[,u] <- x4$type
 }
 
-
+#Curate result
 x$sample <- rownames(x)
 x_plot <- x %>% melt(id.vars = "sample")
-g <- x_plot$variable %>% unlist() %>% as.vector()
-x_plot$dis <- gsub("V","",g) %>% as.numeric()
+x_vec <- x_plot$variable %>% unlist() %>% as.vector()
+x_plot$dis <- gsub("V","",x_vec) %>% as.numeric()
 
 xt <- table(x_plot$sample,x_plot$value) %>% as.data.frame() %>% dcast(Var1~Var2)
 xt_ <- xt %>% select(-REF)
@@ -57,9 +57,8 @@ if (ncol(xt_) == 1) {
   xt$sum <- rowSums(xt_[2:ncol(xt_)])  
 }
 
-
+#Export the AA figure
 reor <- xt %>% arrange(desc(sum),ascending=F) %>% select(Var1) %>% unlist() %>% as.vector()
-
 x_plot$sample <- factor(x_plot$sample,levels=reor)
 x_plot$value <- factor(x_plot$value,levels=c("REF","ALT","DEL","X"))
 
