@@ -3,6 +3,8 @@ library(msa)
 library(Biostrings)
 library(reshape2)
 library(stringr)
+
+#https://stackoverflow.com/questions/48218332/how-to-output-results-of-msa-package-in-r-to-fasta
 alignment2Fasta <- function(alignment, filename) {
   sink(filename)
  
@@ -20,14 +22,13 @@ alignment2Fasta <- function(alignment, filename) {
 
 args <- commandArgs(trailingOnly = TRUE)
 
-############## Flip all seq to + strand ##############
+# Flip all contigs to plus strand 
 df <- readAAStringSet(paste0(args[1],"/QC_contigs.fa"))
-df_name <- do.call(rbind,names(df) %>% strsplit("_","")) %>% as.data.frame()
-l <- nrow(df_name)
-
+df_name <- do.call(rbind,names(df) %>% strsplit("_","")) %>% as.data.frame() 
 df_DNA <- readDNAStringSet(paste0(args[1],"/filter_contigs.fa"))
+
 all_DNA <- c()
-for (i in 1:l) {
+for (i in 1:nrow(df_name)) {
   name_ <- df_name[i,1]
   frame_ <- df_name[i,2] %>% gsub("frame=","",.) %>% as.numeric()
   
@@ -44,7 +45,7 @@ do.call(c,all_DNA) %>% writeXStringSet(.,paste0(args[1],"/optimal_read_DNA_plus.
 x_aln <- do.call(c,all_DNA) %>% msa(method="Muscle",verbose=T)
 alignment2Fasta(x_aln,paste0(args[1],"/optimal_read_DNA_plus_align.fa"))
 
-############## Filter UTR region by self alignment ##############
+# Filter UTR region by self alignment
 xcon <- consensusMatrix(x_aln,as.prob = T)
 df_con <- xcon %>% as.data.frame()
 idx <- row.names(df_con)
@@ -72,8 +73,6 @@ for (x in 1:ncol(df_con)) {
 }
 
 merge_vec <- paste(vec_consensus,collapse = "") %>% gsub("-","",.) %>% gsub(",","N",.)
-#vec_split <- strsplit(merge_vec,",") %>% unlist()  %>% as.vector()
-#consensus_final <- vec_split[which.max(lapply(vec_split,nchar))] %>% DNAStringSet()
 mb <- merge_vec%>% DNAStringSet()
 min_start = unlist(lapply(gregexpr(pattern = 'A|T|C|G', merge_vec), min))
 max_end = unlist(lapply(gregexpr(pattern = 'A|T|C|G', merge_vec), max))
@@ -82,9 +81,7 @@ names(consensus_final) <- args[2]
 consensus_final %>% writeXStringSet(.,paste0(args[1],"/final_consensus_DNA_tmp.fa"))
   
 
-############## Filter UTR region by reference ##############
-print("---------------------------------------------------")
-
+# Filter UTR region by reference 
 ref_ <- readDNAStringSet(paste0(args[1],"/ref_AA_best.fa"))
 ref_name <- names(ref_) %>% strsplit(" ") %>% unlist()
 db_cross <- read.table(paste0(args[3],"/cross_id.tsv"),header = T) %>% 
@@ -100,8 +97,6 @@ aln_df %>% filter(ref != '-') %>% filter(sample != '-') %>% select(sample) %>% u
 obj <- DNAStringSet(curate_read)
 names(obj) <- args[2]
 
-############## Export ##############
+# Export final consensus
 obj %>% writeXStringSet(.,paste0(args[1],"/final_consensus_DNA.fa"))
-#c(obj,ref_DNA) %>% writeXStringSet(.,paste0(args[1],"/consensus_plus_ref.fa"))
-
 
