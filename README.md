@@ -29,7 +29,8 @@ After installing all required packages, you can run the script with following co
 
 ```
 #1. making diamond database
-diamond makedb --in ref_AA.fasta -d db/ref_AA
+gzip -d db/*
+diamond makedb --in db/ref_AA.fasta -d db/ref_AA
 
 #2. running assembly from main script
 ./01_assembly.sh /path/to/fastq_folder output_name db /path/to/SPAdes
