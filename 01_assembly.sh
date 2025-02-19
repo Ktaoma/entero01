@@ -10,7 +10,7 @@ ref_dir=$3      #path to diamond database folder
 SPAdes=$4       #path of SPAdes  
 
 #####
-conda activate General_env
+
 for sample_ in $(ls ${input_dir}/*);
 do
 
@@ -57,8 +57,6 @@ do
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     #2. Implmenment Denovo assembly with different parameters
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
-    conda activate SPAdes_env
     for kmer in 33 55 77 99 111 127;
     do      
         for length in 0 100 300 500;
@@ -74,7 +72,10 @@ do
                     zcat ${path_name}/viral_read.fq.gz | NanoFilt -q ${qual} -l ${length} | gzip -9 > $fl/read_qc.fq.gz
                    
                     #2.3 perform genome assembly
+                    conda activate SPAdes_env
                     $SPAdes -s $fl/read_qc.fq.gz -k $kmer -o $fl/assembly --careful --threads 8 --memory 8
+                    conda activate General_env
+                    
                     full_name=$(echo ${Bname}:${length}:${qual}:${kmer})
                     sed 's/NODE/'$full_name'/g' $fl/assembly/scaffolds.fasta | cut -d '_' -f1 | seqkit rename > $fl/assembly/scaffold_rename.fa
                    
@@ -86,15 +87,13 @@ do
     #3. Curate results
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
-    #move back to general enviroment
-    conda activate General_env 
     #3.1 select the best mapped reference info.
     ensemble_dir=$(echo ${output_name}/${out_dir}/ensemble)
     mkdir -p $ensemble_dir
 
     ##3.1.2 get the reference id with highest frequency and get the sequence in fasta.
     ### Amino acid sequence
-    ref_name=$(cat ${fl_0}/match.tsv |  awk '{ if ($3 >= 85 && $4 >= 100) print $2 }' | sort | uniq -c | \
+    ref_name=$(cat ${path_name}/match.tsv |  awk '{ if ($3 >= 85 && $4 >= 100) print $2 }' | sort | uniq -c | \
         sort -k1 -n | tail -n1 | awk '{ print $2 }')
     awk '/^>/ {printf("\n%s\n",$0);next; } { printf("%s",$0);}  end {printf("\n");}' ${ref_dir}/ref_AA.fasta | \
         grep $ref_name -A1 > ${ensemble_dir}/ref_AA_best.fa
@@ -133,14 +132,14 @@ do
     if [[ $read_count -gt 30000 ]]; then
 
         #depth based on downsampling
-        minimap2 -a $ensemble_dir/final_consensus_DNA.fa ${fl_0}/viral_read.fq.gz > $ensemble_dir/map_${out_dir}.sam
+        minimap2 -a $ensemble_dir/final_consensus_DNA.fa ${path_name}/viral_read.fq.gz > $ensemble_dir/map_${out_dir}.sam
         samtools sort $ensemble_dir/map_${out_dir}.sam -o $ensemble_dir/map_${out_dir}.bam
         samtools index $ensemble_dir/map_${out_dir}.bam
         samtools depth $ensemble_dir/map_${out_dir}.bam > $ensemble_dir/map_${out_dir}_depth.txt
 
         
         #depth based on total read
-        minimap2 -a $ensemble_dir/final_consensus_DNA.fa ${fl_0}/viral_readT.fq.gz > $ensemble_dir/Tmap_${out_dir}.sam
+        minimap2 -a $ensemble_dir/final_consensus_DNA.fa ${path_name}/viral_readT.fq.gz > $ensemble_dir/Tmap_${out_dir}.sam
         samtools sort $ensemble_dir/Tmap_${out_dir}.sam -o $ensemble_dir/Tmap_${out_dir}.bam
         samtools index $ensemble_dir/Tmap_${out_dir}.bam
         samtools depth $ensemble_dir/Tmap_${out_dir}.bam > $ensemble_dir/Tmap_${out_dir}_depth.txt
@@ -149,7 +148,7 @@ do
     else
 
         #depth based on total read
-        minimap2 -a $ensemble_dir/final_consensus_DNA.fa ${fl_0}/viral_read.fq.gz > $ensemble_dir/Tmap_${out_dir}.sam
+        minimap2 -a $ensemble_dir/final_consensus_DNA.fa ${path_name}/viral_read.fq.gz > $ensemble_dir/Tmap_${out_dir}.sam
         samtools sort $ensemble_dir/Tmap_${out_dir}.sam -o $ensemble_dir/Tmap_${out_dir}.bam
         samtools index $ensemble_dir/Tmap_${out_dir}.bam
         samtools depth $ensemble_dir/Tmap_${out_dir}.bam > $ensemble_dir/Tmap_${out_dir}_depth.txt
