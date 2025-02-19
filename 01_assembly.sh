@@ -84,7 +84,7 @@ do
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     #3. Curated results
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+    conda activate General_env #move back to general enviroment
     #3.1 select the best mapped reference information
     ensemble_dir=$(echo ${output_name}/${out_dir}/ensemble)
     mkdir -p $ensemble_dir
