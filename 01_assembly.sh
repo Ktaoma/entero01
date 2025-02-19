@@ -70,7 +70,7 @@ do
                     mkdir -p $fl
                    
                     #2.2 QC before assembling
-                    zcat ${fl_0}/viral_read.fq.gz | NanoFilt -q ${qual} -l ${length} | gzip -9 > $fl/read_qc.fq.gz
+                    zcat ${path_name}/viral_read.fq.gz | NanoFilt -q ${qual} -l ${length} | gzip -9 > $fl/read_qc.fq.gz
                    
                     #2.3 perform genome assembly
                     $SPades -s $fl/read_qc.fq.gz -k $kmer -o $fl/assembly --careful --threads 8 --memory 8
