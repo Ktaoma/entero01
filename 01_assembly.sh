@@ -1,11 +1,16 @@
 #!/bin/bash
+#enable the conda activate in bash
+#code from https://stackoverflow.com/questions/60303997/activating-conda-environment-from-bash-script
+eval "$(conda shell.bash hook)"
+source ~/miniconda3/etc/profile.d/conda.sh
 
-input_dir=$1    #directory with fastq files 
+input_dir=$1    #path to directory with fastq files 
 output_name=$2  #output directory name
-ref_dir=$3      #path of RefSeq files 
+ref_dir=$3      #path to diamond database folder
+SPades=$4       #path of SPAdes  
 
 #####
-
+conda activate General_env
 for sample_ in $(ls ${input_dir}/*);
 do
     #fl_0 -> path_name
@@ -52,7 +57,7 @@ do
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     #2. Denovo assembly with different parameters
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-   
+    conda activate SPades_env
     for kmer in 33 55 77 99 111 127;
     do      
         for length in 0 100 300 500;
@@ -68,7 +73,7 @@ do
                     zcat ${fl_0}/viral_read.fq.gz | NanoFilt -q ${qual} -l ${length} | gzip -9 > $fl/read_qc.fq.gz
                    
                     #2.3 perform genome assembly
-                    spades.py -s $fl/read_qc.fq.gz -k $kmer -o $fl/assembly --careful --threads 8 --memory 8
+                    $SPades -s $fl/read_qc.fq.gz -k $kmer -o $fl/assembly --careful --threads 8 --memory 8
                     full_name=$(echo ${Bname}:${length}:${qual}:${kmer})
                     sed 's/NODE/'$full_name'/g' $fl/assembly/scaffolds.fasta | cut -d '_' -f1 | seqkit rename > $fl/assembly/scaffold_rename.fa
                    
