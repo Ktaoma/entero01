@@ -18,7 +18,7 @@ Please install the following R packages before running the script.
 Raw sequencing reads were deposited in the Sequence Read Archive (SRA) under BioProject accession number [PRJNA1214984](https://www.ncbi.nlm.nih.gov/sra/?term=SRR32105493).
 
 # Usage
-After install all required packages, you can run the script with following command
+After installing all required packages, you can run the script with following command
 
 ```
 #1. making diamond database
