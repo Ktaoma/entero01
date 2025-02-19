@@ -7,7 +7,7 @@ source ~/miniconda3/etc/profile.d/conda.sh
 input_dir=$1    #path to directory with fastq files 
 output_name=$2  #output directory name
 ref_dir=$3      #path to diamond database folder
-SPades=$4       #path of SPAdes  
+SPAdes=$4       #path of SPAdes  
 
 #####
 conda activate General_env
@@ -55,8 +55,9 @@ do
     fi
    
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    #2. Denovo assembly with different parameters
+    #2. Implmenment Denovo assembly with different parameters
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    
     conda activate SPAdes_env
     for kmer in 33 55 77 99 111 127;
     do      
@@ -73,7 +74,7 @@ do
                     zcat ${path_name}/viral_read.fq.gz | NanoFilt -q ${qual} -l ${length} | gzip -9 > $fl/read_qc.fq.gz
                    
                     #2.3 perform genome assembly
-                    $SPades -s $fl/read_qc.fq.gz -k $kmer -o $fl/assembly --careful --threads 8 --memory 8
+                    $SPAdes -s $fl/read_qc.fq.gz -k $kmer -o $fl/assembly --careful --threads 8 --memory 8
                     full_name=$(echo ${Bname}:${length}:${qual}:${kmer})
                     sed 's/NODE/'$full_name'/g' $fl/assembly/scaffolds.fasta | cut -d '_' -f1 | seqkit rename > $fl/assembly/scaffold_rename.fa
                    
@@ -82,14 +83,16 @@ do
     done
 
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    #3. Curated results
+    #3. Curate results
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    conda activate General_env #move back to general enviroment
-    #3.1 select the best mapped reference information
+    
+    #move back to general enviroment
+    conda activate General_env 
+    #3.1 select the best mapped reference info.
     ensemble_dir=$(echo ${output_name}/${out_dir}/ensemble)
     mkdir -p $ensemble_dir
 
-    ##3.1.2 get the reference id with highest frequency and get the sequence in fasta
+    ##3.1.2 get the reference id with highest frequency and get the sequence in fasta.
     ### Amino acid sequence
     ref_name=$(cat ${fl_0}/match.tsv |  awk '{ if ($3 >= 85 && $4 >= 100) print $2 }' | sort | uniq -c | \
         sort -k1 -n | tail -n1 | awk '{ print $2 }')
