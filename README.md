@@ -1,4 +1,4 @@
-# Installation.
+# Installation & Requirements.
 
 ``` 
 conda create --name env bioconda::nanofilt bioconda::diamond bioconda::rasusa bioconda::seqkit bioconda::spades bioconda::minimap2 bioconda::samtools -y
@@ -21,5 +21,9 @@ Raw sequencing reads were deposited in the Sequence Read Archive (SRA) under Bio
 After install all required packages, you can run the script with following command
 
 ```
+#1. making diamond database
+diamond makedb --in ref_AA.fasta -d db/ref_AA
+
+#2. running assembly from main script
 ./01_assembly.sh /path/to/fastq_folder output_name db
 ```
