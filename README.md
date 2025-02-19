@@ -4,7 +4,7 @@ First, two enviroments must be created to avoid any conflicts from packages.
 
 ``` 
 #1. first environment for genetal tasks
-conda create --name env bioconda::nanofilt bioconda::diamond bioconda::rasusa bioconda::seqkit bioconda::minimap2 bioconda::samtools python=3.7.11 -y
+conda create --name General_env bioconda::nanofilt bioconda::diamond bioconda::rasusa bioconda::seqkit bioconda::minimap2 bioconda::samtools python=3.7.11 -y
 
 #2. second enviroment for genome assembly
 conda create -n SPades_env python=3.8.20 -y
