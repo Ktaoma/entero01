@@ -25,35 +25,8 @@ do
     zcat $sample_ |  NanoFilt --headcrop 50 --tailcrop 50 | gzip -9 > ${path_name}/trimmed_raw_reads.fq.gz
     diamond blastx --threads 32 -d ${ref_dir}/ref_AA -q ${path_name}/trimmed_raw_reads.fq.gz -o ${path_name}/match.tsv
     cat ${path_name}/match.tsv  | awk '{ if ($3 >= 85 && $4 >= 100) print $1 }' | sort | uniq > ${path_name}/match_read.txt
-    seqkit grep -f ${path_name}/match_read.txt $sample_ | gzip -9 > ${path_name}/viral_readT.fq.gz
-    read_count=$(seqkit fx2tab ${path_name}/viral_readT.fq.gz | wc -l)
-
-    if [[ $read_count -gt 30000 ]]; then
-
-        ## "downsampling is performed here"
-        #1.1 map to reference DNA 
-        minimap2 -a ${ref_dir}/ref_DNA.fasta  ${path_name}/viral_readT.fq.gz >  ${path_name}/aln.sam
-        samtools sort  ${path_name}/aln.sam -o  ${path_name}/aln.bam
-        samtools index  ${path_name}/aln.bam
-
-        #1.2 select the mapped reference with highest frequency of reads
-        best_index=$(samtools idxstat  ${path_name}/aln.bam | sort -k3  -nr | head -n +1 | cut -f1)
-        samtools view -b ${path_name}/aln.bam $best_index > ${path_name}/sel.bam
-        samtools index ${path_name}/sel.bam
-        samtools view -F 256 -bo ${path_name}/sel_filter.bam ${path_name}/sel.bam
-        samtools index ${path_name}/sel_filter.bam
-
-        #1.3 downsampling by usning rasusa databse (bbnorm could be used in the future version)
-        rasusa aln --coverage 1000 ${path_name}/sel_filter.bam | samtools sort -o  ${path_name}/downsample.bam
-        samtools fastq  ${path_name}/downsample.bam | gzip -9 >  ${path_name}/viral_read.fq.gz
-        seqkit stat ${path_name}/viral_read.fq.gz
-
-    else
-        ## if reads are less than 30k, then do nothing.
-        mv ${path_name}/viral_readT.fq.gz ${path_name}/viral_read.fq.gz
+    seqkit grep -f ${path_name}/match_read.txt $sample_ | gzip -9 > ${path_name}/viral_read.fq.gz    
     
-    fi
-   
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     #2. Implmenment Denovo assembly with different parameters
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -117,7 +90,6 @@ do
     common_seq=$(seqkit fx2tab ${ensemble_dir}/contigs_full_length_AA.fa |\
                  cut -f2 | sort |uniq -c | grep $front_ref | grep $back_ref | sort -k1 -n | tail -n1 | awk '{ print $2 }')
 
-
     seqkit fx2tab ${ensemble_dir}/contigs_full_length_AA.fa | grep $common_seq | seqkit tab2fx > ${ensemble_dir}/QC_contigs.fa
     cat ${ensemble_dir}/QC_contigs.fa | grep ">" | cut -d"_" -f1 | sed 's\>\\g' > ${ensemble_dir}/QC_contigs_id.fa
 
@@ -129,34 +101,11 @@ do
     Rscript ./03_flip_strand.R ${ensemble_dir} ${out_dir} ${ref_dir}
    
     #3.5 calculate read depth
-    if [[ $read_count -gt 30000 ]]; then
+    minimap2 -a $ensemble_dir/final_consensus_DNA.fa ${path_name}/viral_read.fq.gz > $ensemble_dir/Tmap_${out_dir}.sam
+    samtools sort $ensemble_dir/Tmap_${out_dir}.sam -o $ensemble_dir/Tmap_${out_dir}.bam
+    samtools index $ensemble_dir/Tmap_${out_dir}.bam
+    samtools depth $ensemble_dir/Tmap_${out_dir}.bam > $ensemble_dir/Tmap_${out_dir}_depth.txt        
 
-        #depth based on downsampling
-        minimap2 -a $ensemble_dir/final_consensus_DNA.fa ${path_name}/viral_read.fq.gz > $ensemble_dir/map_${out_dir}.sam
-        samtools sort $ensemble_dir/map_${out_dir}.sam -o $ensemble_dir/map_${out_dir}.bam
-        samtools index $ensemble_dir/map_${out_dir}.bam
-        samtools depth $ensemble_dir/map_${out_dir}.bam > $ensemble_dir/map_${out_dir}_depth.txt
-
-        
-        #depth based on total read
-        minimap2 -a $ensemble_dir/final_consensus_DNA.fa ${path_name}/viral_readT.fq.gz > $ensemble_dir/Tmap_${out_dir}.sam
-        samtools sort $ensemble_dir/Tmap_${out_dir}.sam -o $ensemble_dir/Tmap_${out_dir}.bam
-        samtools index $ensemble_dir/Tmap_${out_dir}.bam
-        samtools depth $ensemble_dir/Tmap_${out_dir}.bam > $ensemble_dir/Tmap_${out_dir}_depth.txt
-    
-      
-    else
-
-        #depth based on total read
-        minimap2 -a $ensemble_dir/final_consensus_DNA.fa ${path_name}/viral_read.fq.gz > $ensemble_dir/Tmap_${out_dir}.sam
-        samtools sort $ensemble_dir/Tmap_${out_dir}.sam -o $ensemble_dir/Tmap_${out_dir}.bam
-        samtools index $ensemble_dir/Tmap_${out_dir}.bam
-        samtools depth $ensemble_dir/Tmap_${out_dir}.bam > $ensemble_dir/Tmap_${out_dir}_depth.txt
-    
-    fi
-    
-    
-          
 done
 
 
