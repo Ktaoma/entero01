@@ -13,7 +13,7 @@ SPades=$4       #path of SPAdes
 conda activate General_env
 for sample_ in $(ls ${input_dir}/*);
 do
-    #fl_0 -> path_name
+
     out_dir=$(echo $sample_ | rev | cut -d '/' -f1 | rev | cut -d '.' -f1)
     path_name=$(echo ${output_name}/${out_dir})
     mkdir -p $path_name
@@ -57,7 +57,7 @@ do
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     #2. Denovo assembly with different parameters
     #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    conda activate SPades_env
+    conda activate SPAdes_env
     for kmer in 33 55 77 99 111 127;
     do      
         for length in 0 100 300 500;
