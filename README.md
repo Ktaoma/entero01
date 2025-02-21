@@ -1,4 +1,4 @@
-# Installation & Requirements.
+# Installation
 
 First, two environments must be created to avoid any conflicts among softwares.
 
@@ -9,7 +9,7 @@ conda create --name General_env python=3.7.11 bioconda::nanofilt bioconda::diamo
 #2. second enviroment for genome assembly task
 conda create --name SPAdes_env python=3.8.20 -y
 
-#3. SPAdes software
+#3. install SPAdes software for second enviroment
 wget https://github.com/ablab/spades/releases/download/v4.0.0/SPAdes-4.0.0-Linux.tar.gz
 tar -xf SPAdes-4.0.0-Linux.tar.gz
 ```
