@@ -36,7 +36,7 @@ for (u in 1:ncol(x)) {
                     ifelse(x2$Var1 == '-',"DEL",
                            ifelse(x2$Var1 == 'X','X',"ALT")))
   
-  x3 <- x2[,u] %>% as.data.frame()
+  x3 <- x[,u] %>% as.data.frame()
   colnames(x3) <- "Var1"
   
   x4 <- inner_join(x3,x2)
